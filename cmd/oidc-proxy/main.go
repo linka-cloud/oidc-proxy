@@ -2,20 +2,19 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"net/http"
-	"net/http/httputil"
 	"net/url"
 	"os"
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+	proxy "gitlab.bertha.cloud/partitio/lab/oidc-proxy/pkg/proxy"
 
 	oidc_handlers "gitlab.bertha.cloud/partitio/lab/oidc-handlers"
 )
 
 func main() {
-	conf := oidc_handlers.Config{}
+	oidcConfig := oidc_handlers.Config{}
+	configPath := "config.yaml"
 	address := ":8888"
 	app := cli.NewApp()
 	app.Name = "oidc-proxy"
@@ -28,26 +27,26 @@ func main() {
 			Flags: append(app.Flags,
 				&cli.StringFlag{
 					Name:        "issuer-url",
-					Destination: &conf.IssuerURL,
+					Destination: &oidcConfig.IssuerURL,
 					EnvVars:     []string{"ISSUER_URL"},
 					Required:    true,
 				},
 				&cli.StringFlag{
 					Name:        "client-id",
-					Destination: &conf.ClientID,
+					Destination: &oidcConfig.ClientID,
 					EnvVars:     []string{"CLIENT_ID"},
 					Required:    true,
 				},
 				&cli.StringFlag{
 					Name:        "client-secret",
-					Destination: &conf.ClientSecret,
+					Destination: &oidcConfig.ClientSecret,
 					EnvVars:     []string{"CLIENT_SECRET"},
 					Required:    true,
 				},
 				&cli.StringFlag{
-					Name: "callback-url",
-					Destination: &conf.OauthCallback,
-					EnvVars: []string{"CALLBACK_URL"},
+					Name:        "callback-url",
+					Destination: &oidcConfig.OauthCallback,
+					EnvVars:     []string{"CALLBACK_URL"},
 				},
 				&cli.StringFlag{
 					Name:        "address",
@@ -57,8 +56,19 @@ func main() {
 				},
 				&cli.StringFlag{
 					Name:        "web-url",
-					Destination: &conf.CookieConfig.Domain,
+					Destination: &oidcConfig.CookieConfig.Domain,
 					EnvVars:     []string{"WEB_URL"},
+				},
+				&cli.StringFlag{
+					Name:        "id-token-cookie",
+					Destination: &oidcConfig.CookieConfig.IDTokenName,
+					EnvVars:     []string{"ID_TOKEN_COOKIE"},
+					Usage:       "the id token cookie name",
+					Value:       "id_token",
+				},
+				&cli.StringFlag{
+					Name: "config",
+					Destination: &configPath,
 				},
 			),
 			Action: func(c *cli.Context) error {
@@ -73,38 +83,11 @@ func main() {
 				if err != nil {
 					logrus.Fatalf("failed to parse backend: %v", err)
 				}
-
-				prox := httputil.NewSingleHostReverseProxy(u)
-
-				conf.Logger = logrus.New()
-				oidc, err := oidc_handlers.New(ctx, conf)
+				proxy, err := proxy.New(ctx, u, oidcConfig, configPath, address)
 				if err != nil {
 					logrus.Fatal(err)
 				}
-				cURL, err := url.Parse(conf.OauthCallback)
-				if err != nil {
-				    logrus.Fatalf("parse callback url: %v", err)
-				}
-				http.HandleFunc("/oidc/auth", oidc.RedirectHandler)
-				http.HandleFunc(cURL.Path, oidc.CallbackHandler)
-				http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-					tk, err := oidc.Refresh(w, r)
-					if err != nil {
-						logrus.Error(err)
-						oidc.SetRedirectCookie(w, "/")
-						http.Redirect(w, r, "/oidc/auth", http.StatusSeeOther)
-						return
-					}
-					if c, err := r.Cookie(conf.CookieConfig.IDTokenName); tk == "" && err == nil {
-						tk = c.Value
-					}
-					r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tk))
-					prox.ServeHTTP(w, r)
-				})
-				if err := http.ListenAndServe(address, nil); err != nil {
-					logrus.Fatal(err)
-				}
-				return nil
+				return proxy.Run()
 			},
 		},
 	}

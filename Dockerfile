@@ -8,9 +8,10 @@ COPY go.mod .
 
 RUN go mod download
 
-COPY main.go .
+COPY cmd cmd
+COPY pkg pkg
 
-RUN go build -o oidc-proxy .
+RUN go build -o oidc-proxy ./cmd/oidc-proxy
 
 FROM alpine
 

@@ -1,0 +1,9 @@
+defaultPolicy: REJECT
+endpoints:
+- host: localhost:8888
+  # implicit
+  # defaultPolicy: REJECT
+  groups:
+  - name: admin
+    # implicit
+    # policy: ACCEPT
