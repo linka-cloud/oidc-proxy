@@ -55,9 +55,9 @@ func main() {
 					Value:       ":8888",
 				},
 				&cli.StringFlag{
-					Name:        "web-url",
+					Name:        "cookie-domain",
 					Destination: &oidcConfig.CookieConfig.Domain,
-					EnvVars:     []string{"WEB_URL"},
+					EnvVars:     []string{"COOKIE_DOMAIN"},
 				},
 				&cli.StringFlag{
 					Name:        "id-token-cookie",
