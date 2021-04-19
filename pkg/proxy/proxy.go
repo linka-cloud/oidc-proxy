@@ -51,7 +51,9 @@ func New(opt ...Option) (*proxy, error) {
 	}
 	aclChan := conf.Watch()
 	go func() {
-		acl.UpdateACL(<-aclChan)
+		for {
+			acl.UpdateACL(<-aclChan)
+		}
 	}()
 
 	mux := http.NewServeMux()

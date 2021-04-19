@@ -39,14 +39,20 @@ func (c *config) ACL() *acl.ACL {
 
 func (c *config) Watch() <-chan *acl.ACL {
 	confCh := make(chan *acl.ACL, 10)
-	viper.OnConfigChange(func(_ fsnotify.Event) {
+	viper.OnConfigChange(func(e fsnotify.Event) {
 		logrus.Info("reloading config")
 		acl := &acl.ACL{}
-		if err := viper.Unmarshal(acl); err != nil {
+		viper.SetConfigFile(e.Name)
+		if err := viper.ReadInConfig(); err != nil {
 			logrus.Errorf("reload config: %v", err)
+			return
+		}
+		if err := viper.Unmarshal(acl); err != nil {
+			logrus.Errorf("parse config: %v", err)
 			return
 		}
 		confCh <- acl
 	})
+	viper.WatchConfig()
 	return confCh
 }
