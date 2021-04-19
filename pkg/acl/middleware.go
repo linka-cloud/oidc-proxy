@@ -70,4 +70,3 @@ func (m *ACLMiddleware) enforce(next http.Handler, w http.ResponseWriter, r *htt
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 	}
 }
-

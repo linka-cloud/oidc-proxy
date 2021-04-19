@@ -7,6 +7,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 
+	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
 	oidc_handlers "gitlab.bertha.cloud/partitio/lab/oidc-handlers"
 	acl2 "gitlab.bertha.cloud/partitio/lab/oidc-proxy/pkg/acl"
@@ -14,23 +15,33 @@ import (
 )
 
 type proxy struct {
-	mux     *http.ServeMux
-	address string
+	mux  http.Handler
+	opts *options
 }
 
-func New(ctx context.Context, u *url.URL, oidcConfig oidc_handlers.Config, configPath string, address string) (*proxy, error) {
-	prox := httputil.NewSingleHostReverseProxy(u)
+func New(opt ...Option) (*proxy, error) {
+	opts := &options{}
+	for _, v := range opt {
+		v(opts)
+	}
+	if opts.ctx == nil {
+		opts.ctx = context.Background()
+	}
+	if opts.address == "" {
+		opts.address = ":8888"
+	}
+	prox := httputil.NewSingleHostReverseProxy(opts.u)
 
-	oidcConfig.Logger = logrus.New()
-	oidc, err := oidc_handlers.New(ctx, oidcConfig)
+	opts.oidcConfig.Logger = logrus.New()
+	oidc, err := oidc_handlers.New(opts.ctx, opts.oidcConfig)
 	if err != nil {
 		return nil, err
 	}
-	cURL, err := url.Parse(oidcConfig.OauthCallback)
+	cURL, err := url.Parse(opts.oidcConfig.OauthCallback)
 	if err != nil {
 		return nil, fmt.Errorf("parse callback url: %w", err)
 	}
-	conf, err := config.Load(configPath)
+	conf, err := config.Load(opts.configPath)
 	if err != nil {
 		return nil, fmt.Errorf("load config: %w", err)
 	}
@@ -54,15 +65,29 @@ func New(ctx context.Context, u *url.URL, oidcConfig oidc_handlers.Config, confi
 			http.Redirect(w, r, "/oidc/auth", http.StatusSeeOther)
 			return
 		}
-		if c, err := r.Cookie(oidcConfig.CookieConfig.IDTokenName); tk == "" && err == nil {
+		if c, err := r.Cookie(opts.oidcConfig.CookieConfig.IDTokenName); tk == "" && err == nil {
 			tk = c.Value
 		}
 		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tk))
 		acl.EnforceFunc(prox.ServeHTTP).ServeHTTP(w, r)
 	})
-	return &proxy{mux: mux, address: address}, nil
+	cors := cors.New(cors.Options{
+		AllowedOrigins: opts.allowedOrigins,
+		AllowedMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodPatch,
+			http.MethodHead,
+			http.MethodDelete,
+			http.MethodOptions,
+		},
+		AllowedHeaders:   []string{"*"},
+		AllowCredentials: true,
+	})
+	return &proxy{mux: cors.Handler(mux), opts: opts}, nil
 }
 
 func (p *proxy) Run() error {
-	return http.ListenAndServe(p.address, p.mux)
+	return http.ListenAndServe(p.opts.address, p.mux)
 }

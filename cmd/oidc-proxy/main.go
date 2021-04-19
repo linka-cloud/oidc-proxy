@@ -16,6 +16,8 @@ func main() {
 	oidcConfig := oidc_handlers.Config{}
 	configPath := "config.yaml"
 	address := ":8888"
+	allowedOrigins := &cli.StringSlice{}
+
 	app := cli.NewApp()
 	app.Name = "oidc-proxy"
 	app.Usage = "An OIDC Proxy"
@@ -67,8 +69,14 @@ func main() {
 					Value:       "id_token",
 				},
 				&cli.StringFlag{
-					Name: "config",
+					Name:        "config",
 					Destination: &configPath,
+				},
+				&cli.StringSliceFlag{
+					Name:        "allowed-origins",
+					Usage:       "cors' allowed origins",
+					Destination: allowedOrigins,
+					EnvVars:     []string{"ALLOWED_ORIGINS"},
 				},
 			),
 			Action: func(c *cli.Context) error {
@@ -83,7 +91,17 @@ func main() {
 				if err != nil {
 					logrus.Fatalf("failed to parse backend: %v", err)
 				}
-				proxy, err := proxy.New(ctx, u, oidcConfig, configPath, address)
+				if u.Scheme == "" {
+					u.Scheme = "http"
+				}
+				proxy, err := proxy.New(
+					proxy.WithContext(ctx),
+					proxy.WithBackend(u),
+					proxy.WithOIDC(oidcConfig),
+					proxy.WithConfig(configPath),
+					proxy.WithAddress(address),
+					proxy.WithAllowedOrigins(allowedOrigins.Value()...),
+				)
 				if err != nil {
 					logrus.Fatal(err)
 				}
