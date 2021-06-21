@@ -10,6 +10,7 @@ import (
 	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
 	oidc_handlers "gitlab.bertha.cloud/partitio/lab/oidc-handlers"
+
 	acl2 "gitlab.bertha.cloud/partitio/lab/oidc-proxy/pkg/acl"
 	"gitlab.bertha.cloud/partitio/lab/oidc-proxy/pkg/config"
 )
