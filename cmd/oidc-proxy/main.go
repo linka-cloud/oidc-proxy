@@ -7,9 +7,10 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
-	proxy "gitlab.bertha.cloud/partitio/lab/oidc-proxy/pkg/proxy"
 
-	oidc_handlers "gitlab.bertha.cloud/partitio/lab/oidc-handlers"
+	proxy "go.linka.cloud/oidc-proxy/pkg/proxy"
+
+	oidc_handlers "go.linka.cloud/oidc-handlers"
 )
 
 func main() {
@@ -67,6 +68,12 @@ func main() {
 					EnvVars:     []string{"ID_TOKEN_COOKIE"},
 					Usage:       "the id token cookie name",
 					Value:       "id_token",
+				},
+				&cli.StringFlag{
+					Name:        "session-key",
+					Usage:       "the session key used to encrypt the session cookie.",
+					Destination: &oidcConfig.CookieConfig.Key,
+					EnvVars:     []string{"SESSION_KEY"},
 				},
 				&cli.StringFlag{
 					Name:        "config",

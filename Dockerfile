@@ -5,6 +5,7 @@ RUN apk add git ca-certificates
 WORKDIR /oidc-proxy
 
 COPY go.mod .
+COPY go.sum .
 
 RUN go mod download
 

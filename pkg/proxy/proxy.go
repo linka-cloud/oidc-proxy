@@ -9,18 +9,21 @@ import (
 
 	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
-	oidc_handlers "gitlab.bertha.cloud/partitio/lab/oidc-handlers"
 
-	acl2 "gitlab.bertha.cloud/partitio/lab/oidc-proxy/pkg/acl"
-	"gitlab.bertha.cloud/partitio/lab/oidc-proxy/pkg/config"
+	acl2 "go.linka.cloud/oidc-proxy/pkg/acl"
+	"go.linka.cloud/oidc-proxy/pkg/config"
 )
+
+type Proxy interface {
+	Run() error
+}
 
 type proxy struct {
 	mux  http.Handler
 	opts *options
 }
 
-func New(opt ...Option) (*proxy, error) {
+func New(opt ...Option) (Proxy, error) {
 	opts := &options{}
 	for _, v := range opt {
 		v(opts)
@@ -34,7 +37,7 @@ func New(opt ...Option) (*proxy, error) {
 	prox := httputil.NewSingleHostReverseProxy(opts.u)
 
 	opts.oidcConfig.Logger = logrus.New()
-	oidc, err := oidc_handlers.New(opts.ctx, opts.oidcConfig)
+	oidc, err := opts.oidcConfig.WebHandler(opts.ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -59,6 +62,7 @@ func New(opt ...Option) (*proxy, error) {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/oidc/auth", oidc.RedirectHandler)
+	mux.HandleFunc("/oidc/logout", oidc.LogoutHandler)
 	mux.HandleFunc(cURL.Path, oidc.CallbackHandler)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		tk, err := oidc.Refresh(w, r)

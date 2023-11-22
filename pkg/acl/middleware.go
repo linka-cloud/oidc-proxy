@@ -3,7 +3,7 @@ package acl
 import (
 	"net/http"
 
-	oidc_handlers "gitlab.bertha.cloud/partitio/lab/oidc-handlers"
+	oidc_handlers "go.linka.cloud/oidc-handlers"
 )
 
 func NewACLMiddleware(a *ACL) (*ACLMiddleware, error) {

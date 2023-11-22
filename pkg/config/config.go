@@ -6,7 +6,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
-	"gitlab.bertha.cloud/partitio/lab/oidc-proxy/pkg/acl"
+
+	"go.linka.cloud/oidc-proxy/pkg/acl"
 )
 
 type Config interface {
@@ -18,7 +19,7 @@ type config struct {
 	acl *acl.ACL
 }
 
-func Load(path string) (*config, error) {
+func Load(path string) (Config, error) {
 	viper.AddConfigPath(".")
 	viper.AddConfigPath(filepath.Dir(path))
 	viper.SetConfigFile(path)

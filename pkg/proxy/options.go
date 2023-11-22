@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/url"
 
-	oidc_handlers "gitlab.bertha.cloud/partitio/lab/oidc-handlers"
+	oidc_handlers "go.linka.cloud/oidc-handlers"
 )
 
 type options struct {
