@@ -70,6 +70,33 @@ func main() {
 					Value:       "id_token",
 				},
 				&cli.StringFlag{
+					Name:        "refresh-token-cookie",
+					Destination: &oidcConfig.CookieConfig.RefreshTokenName,
+					EnvVars:     []string{"REFRESH_TOKEN_COOKIE"},
+					Usage:       "the refresh token cookie name",
+					Value:       "refresh_token",
+				},
+				&cli.StringFlag{
+					Name:        "auth-state-cookie",
+					Destination: &oidcConfig.CookieConfig.AuthStateName,
+					EnvVars:     []string{"AUTH_STATE_COOKIE"},
+					Usage:       "the auth state cookie name",
+					Value:       "auth_state",
+				},
+				&cli.StringFlag{
+					Name:        "redirect-cookie",
+					Destination: &oidcConfig.CookieConfig.RedirectName,
+					EnvVars:     []string{"REDIRECT_COOKIE"},
+					Usage:       "the redirect cookie name",
+					Value:       "redirect",
+				},
+				&cli.BoolFlag{
+					Name:        "cookie-secure",
+					Destination: &oidcConfig.CookieConfig.Secure,
+					EnvVars:     []string{"COOKIE_SECURE"},
+					Usage:       "whether the cookie is secure",
+				},
+				&cli.StringFlag{
 					Name:        "session-key",
 					Usage:       "the session key used to encrypt the session cookie.",
 					Destination: &oidcConfig.CookieConfig.Key,
@@ -112,7 +139,7 @@ func main() {
 				if err != nil {
 					logrus.Fatal(err)
 				}
-				return proxy.Run()
+				return proxy.Serve()
 			},
 		},
 	}

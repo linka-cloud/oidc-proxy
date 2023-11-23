@@ -15,7 +15,9 @@ import (
 )
 
 type Proxy interface {
-	Run() error
+	Serve() error
+	ServeTLS(certFile, keyFile string) error
+	Handler() http.Handler
 }
 
 type proxy struct {
@@ -95,6 +97,14 @@ func New(opt ...Option) (Proxy, error) {
 	return &proxy{mux: cors.Handler(mux), opts: opts}, nil
 }
 
-func (p *proxy) Run() error {
+func (p *proxy) Serve() error {
 	return http.ListenAndServe(p.opts.address, p.mux)
+}
+
+func (p *proxy) ServeTLS(certFile, keyFile string) error {
+	return http.ListenAndServeTLS(p.opts.address, certFile, keyFile, p.mux)
+}
+
+func (p *proxy) Handler() http.Handler {
+	return p.mux
 }

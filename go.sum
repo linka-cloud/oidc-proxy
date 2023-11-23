@@ -1629,10 +1629,10 @@ go.etcd.io/etcd/api/v3 v3.5.9/go.mod h1:uyAal843mC8uUVSLWz6eHa/d971iDGnCRpmKd2Z+
 go.etcd.io/etcd/client/pkg/v3 v3.5.9/go.mod h1:y+CzeSmkMpWN2Jyu1npecjB9BBnABxGM4pN8cGuJeL4=
 go.etcd.io/etcd/client/v2 v2.305.9/go.mod h1:0NBdNx9wbxtEQLwAQtrDHwx58m02vXpDcgSYI2seohQ=
 go.etcd.io/etcd/client/v3 v3.5.9/go.mod h1:i/Eo5LrZ5IKqpbtpPDuaUnDOUv471oDg8cjQaUr2MbA=
-go.linka.cloud/go-oidc/v3 v3.0.1-0.20231110111922-95602609e6b6 h1:aqCyeBlBplgNaTNvcJGTogEzxagh7ua+Pa+JD+qedxI=
-go.linka.cloud/go-oidc/v3 v3.0.1-0.20231110111922-95602609e6b6/go.mod h1:PE0aiq/Nz1x/eKalTmRcrrLrQUO864Qci3hFHiuHosA=
-go.linka.cloud/oidc-handlers v0.0.8 h1:PBoCUO0z4phQeEkEn4NKOhFyUlyfGVKB4AGda9wIG00=
-go.linka.cloud/oidc-handlers v0.0.8/go.mod h1:rvvT+fBUDqG0RWYtik0tUk1roNGvtkqJFdZRO0Uj5Ys=
+go.linka.cloud/go-oidc/v3 v3.7.0 h1:dF5xs4p/7UwIdopxwudZQj1f6RzceH00WOQazN9raa0=
+go.linka.cloud/go-oidc/v3 v3.7.0/go.mod h1:PE0aiq/Nz1x/eKalTmRcrrLrQUO864Qci3hFHiuHosA=
+go.linka.cloud/oidc-handlers v0.1.0 h1:bHt/z4jFHiQbTP2uBf65BmLSDRYRBhDDdbv9vsxLzyY=
+go.linka.cloud/oidc-handlers v0.1.0/go.mod h1:0S9iP7sBeukTDDSexWdqf9KnFmmx2701y6SKghHj2T4=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
