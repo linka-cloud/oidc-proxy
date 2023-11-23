@@ -14,6 +14,10 @@ type options struct {
 	configPath     string
 	address        string
 	allowedOrigins []string
+
+	clientCA   string
+	clientKey  string
+	clientCert string
 }
 
 type Option func(o *options)
@@ -51,5 +55,23 @@ func WithAddress(address string) Option {
 func WithAllowedOrigins(origin ...string) Option {
 	return func(o *options) {
 		o.allowedOrigins = origin
+	}
+}
+
+func WithClientCA(ca string) Option {
+	return func(o *options) {
+		o.clientCA = ca
+	}
+}
+
+func WithClientKey(key string) Option {
+	return func(o *options) {
+		o.clientKey = key
+	}
+}
+
+func WithClientCert(cert string) Option {
+	return func(o *options) {
+		o.clientCert = cert
 	}
 }

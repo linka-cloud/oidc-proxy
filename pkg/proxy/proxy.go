@@ -2,10 +2,14 @@ package proxy
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 
 	"github.com/rs/cors"
 	"github.com/sirupsen/logrus"
@@ -37,6 +41,28 @@ func New(opt ...Option) (Proxy, error) {
 		opts.address = ":8888"
 	}
 	prox := httputil.NewSingleHostReverseProxy(opts.u)
+
+	if opts.clientCA != "" && opts.clientKey != "" && opts.clientCert != "" {
+		pem, err := os.ReadFile(opts.clientCA)
+		if err != nil {
+			return nil, fmt.Errorf("read client ca: %w", err)
+		}
+		caCertPool := x509.NewCertPool()
+		if !caCertPool.AppendCertsFromPEM(pem) {
+			return nil, errors.New("failed to setup client ca")
+		}
+		cert, err := tls.LoadX509KeyPair(opts.clientCert, opts.clientKey)
+		if err != nil {
+			return nil, fmt.Errorf("load client cert: %w", err)
+		}
+		prox.Transport = &http.Transport{
+			TLSClientConfig: &tls.Config{
+				RootCAs:            caCertPool,
+				Certificates:       []tls.Certificate{cert},
+				InsecureSkipVerify: true,
+			},
+		}
+	}
 
 	opts.oidcConfig.Logger = logrus.New()
 	oidc, err := opts.oidcConfig.WebHandler(opts.ctx)

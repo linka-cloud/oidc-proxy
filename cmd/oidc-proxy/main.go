@@ -18,6 +18,7 @@ func main() {
 	configPath := "config.yaml"
 	address := ":8888"
 	allowedOrigins := &cli.StringSlice{}
+	var opts []proxy.Option
 
 	app := cli.NewApp()
 	app.Name = "oidc-proxy"
@@ -112,6 +113,33 @@ func main() {
 					Destination: allowedOrigins,
 					EnvVars:     []string{"ALLOWED_ORIGINS"},
 				},
+				&cli.StringFlag{
+					Name:    "client-ca",
+					Usage:   "the client ca used to verify the backend cert",
+					EnvVars: []string{"CLIENT_CA"},
+					Action: func(c *cli.Context, s string) error {
+						opts = append(opts, proxy.WithClientCA(s))
+						return nil
+					},
+				},
+				&cli.StringFlag{
+					Name:    "client-key",
+					Usage:   "the client key used to authenticate to the backend with mTLS.",
+					EnvVars: []string{"CLIENT_KEY"},
+					Action: func(c *cli.Context, s string) error {
+						opts = append(opts, proxy.WithClientKey(s))
+						return nil
+					},
+				},
+				&cli.StringFlag{
+					Name:    "client-cert",
+					Usage:   "the client cert used to authenticate to the backend with mTLS.",
+					EnvVars: []string{"CLIENT_CERT"},
+					Action: func(c *cli.Context, s string) error {
+						opts = append(opts, proxy.WithClientCert(s))
+						return nil
+					},
+				},
 			),
 			Action: func(c *cli.Context) error {
 				if c.Args().Len() == 0 {
@@ -128,7 +156,7 @@ func main() {
 				if u.Scheme == "" {
 					u.Scheme = "http"
 				}
-				proxy, err := proxy.New(
+				opts = append(opts,
 					proxy.WithContext(ctx),
 					proxy.WithBackend(u),
 					proxy.WithOIDC(oidcConfig),
@@ -136,6 +164,7 @@ func main() {
 					proxy.WithAddress(address),
 					proxy.WithAllowedOrigins(allowedOrigins.Value()...),
 				)
+				proxy, err := proxy.New(opts...)
 				if err != nil {
 					logrus.Fatal(err)
 				}
