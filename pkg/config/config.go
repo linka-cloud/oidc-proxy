@@ -1,11 +1,12 @@
 package config
 
 import (
+	"context"
 	"path/filepath"
 
 	"github.com/fsnotify/fsnotify"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"go.linka.cloud/grpc-toolkit/logger"
 
 	"go.linka.cloud/oidc-proxy/pkg/acl"
 )
@@ -40,16 +41,17 @@ func (c *config) ACL() *acl.ACL {
 
 func (c *config) Watch() <-chan *acl.ACL {
 	confCh := make(chan *acl.ACL, 10)
+	log := logger.C(context.Background()).WithField("component", "config")
 	viper.OnConfigChange(func(e fsnotify.Event) {
-		logrus.Info("reloading config")
+		log.WithField("path", e.Name).Info("reloading config")
 		acl := &acl.ACL{}
 		viper.SetConfigFile(e.Name)
 		if err := viper.ReadInConfig(); err != nil {
-			logrus.Errorf("reload config: %v", err)
+			log.WithError(err).Error("reload config")
 			return
 		}
 		if err := viper.Unmarshal(acl); err != nil {
-			logrus.Errorf("parse config: %v", err)
+			log.WithError(err).Error("parse config")
 			return
 		}
 		confCh <- acl

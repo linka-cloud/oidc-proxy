@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"os"
 
-	"github.com/sirupsen/logrus"
 	"github.com/urfave/cli/v2"
+	"go.linka.cloud/grpc-toolkit/logger"
 
 	proxy "go.linka.cloud/oidc-proxy/pkg/proxy"
 
@@ -143,15 +143,16 @@ func main() {
 			),
 			Action: func(c *cli.Context) error {
 				if c.Args().Len() == 0 {
-					logrus.Fatal("expected proxy backend as argument")
+					logger.C(context.Background()).Fatal("expected proxy backend as argument")
 				}
 
 				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
+				log := logger.C(ctx).WithField("component", "oidc-proxy")
 
 				u, err := url.Parse(c.Args().First())
 				if err != nil {
-					logrus.Fatalf("failed to parse backend: %v", err)
+					log.WithError(err).Fatal("parse backend")
 				}
 				if u.Scheme == "" {
 					u.Scheme = "http"
@@ -166,7 +167,7 @@ func main() {
 				)
 				proxy, err := proxy.New(opts...)
 				if err != nil {
-					logrus.Fatal(err)
+					log.WithError(err).Fatal("create proxy")
 				}
 				return proxy.Serve()
 			},

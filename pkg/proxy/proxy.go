@@ -12,7 +12,7 @@ import (
 	"os"
 
 	"github.com/rs/cors"
-	"github.com/sirupsen/logrus"
+	"go.linka.cloud/grpc-toolkit/logger"
 
 	acl2 "go.linka.cloud/oidc-proxy/pkg/acl"
 	"go.linka.cloud/oidc-proxy/pkg/config"
@@ -64,7 +64,6 @@ func New(opt ...Option) (Proxy, error) {
 		}
 	}
 
-	opts.oidcConfig.Logger = logrus.New()
 	oidc, err := opts.oidcConfig.WebHandler(opts.ctx)
 	if err != nil {
 		return nil, err
@@ -95,7 +94,7 @@ func New(opt ...Option) (Proxy, error) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		tk, err := oidc.Refresh(w, r)
 		if err != nil {
-			logrus.Error(err)
+			logger.C(r.Context()).WithField("component", "proxy").WithError(err).Error("refresh token")
 			oidc.SetRedirectCookie(w, "/")
 			http.Redirect(w, r, "/oidc/auth", http.StatusSeeOther)
 			return
