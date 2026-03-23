@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"fmt"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"go.linka.cloud/grpc-toolkit/logger"
 
 	oidc_handlers "go.linka.cloud/oidc-handlers"
-
 	"go.linka.cloud/oidc-proxy/pkg/proxy"
 )
 
@@ -46,14 +46,20 @@ type serveCmd struct {
 	OIDC
 	Cookie
 	MTLS
-	Address        string   `name:"address" usage:"listen address" env:"ADDRESS" default:":8888"`
-	ConfigPath     string   `name:"config" usage:"acl config path" default:"config.yaml"`
-	AllowedOrigins []string `name:"allowed-origins" usage:"cors' allowed origins" env:"ALLOWED_ORIGINS"`
+	Address        string            `name:"address" usage:"listen address" env:"ADDRESS" default:":8888"`
+	ConfigPath     string            `name:"config" usage:"acl config path" default:"config.yaml"`
+	AllowedOrigins []string          `name:"allowed-origins" usage:"cors' allowed origins" env:"ALLOWED_ORIGINS"`
+	BackendHeaders map[string]string `name:"backend-header" usage:"header to pass to backend (repeat key=value)"`
+}
+
+type runCfg struct {
+	origins []string
+	headers map[string]string
 }
 
 func (c *serveCmd) Run(cmd *cobra.Command, args []string) error {
-	origins := c.allowedOrigins()
-	if err := c.validate(origins); err != nil {
+	cfg, err := c.resolve()
+	if err != nil {
 		return err
 	}
 
@@ -63,7 +69,7 @@ func (c *serveCmd) Run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	p, err := proxy.New(c.opts(ctx, u, origins)...)
+	p, err := proxy.New(c.opts(ctx, u, cfg)...)
 	if err != nil {
 		log.WithError(err).Error("create proxy")
 		return err
@@ -71,30 +77,39 @@ func (c *serveCmd) Run(cmd *cobra.Command, args []string) error {
 	return p.Serve()
 }
 
-func (c *serveCmd) validate(origins []string) error {
+func (c *serveCmd) resolve() (*runCfg, error) {
 	if c.IssuerURL == "" {
-		return fmt.Errorf("issuer-url is required")
+		return nil, fmt.Errorf("issuer-url is required")
 	}
 	if c.ClientID == "" {
-		return fmt.Errorf("client-id is required")
+		return nil, fmt.Errorf("client-id is required")
 	}
 	if c.ClientSecret == "" {
-		return fmt.Errorf("client-secret is required")
+		return nil, fmt.Errorf("client-secret is required")
 	}
+	origins := c.allowedOrigins()
 	if err := validateOrigins(origins); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	headers, err := c.backendHeaders()
+	if err != nil {
+		return nil, err
+	}
+	return &runCfg{
+		origins: origins,
+		headers: headers,
+	}, nil
 }
 
-func (c *serveCmd) opts(ctx context.Context, u *url.URL, origins []string) []proxy.Option {
+func (c *serveCmd) opts(ctx context.Context, u *url.URL, cfg *runCfg) []proxy.Option {
 	opts := []proxy.Option{
 		proxy.WithContext(ctx),
 		proxy.WithBackend(u),
 		proxy.WithOIDC(c.oidcConfig()),
 		proxy.WithConfig(c.ConfigPath),
 		proxy.WithAddress(c.Address),
-		proxy.WithAllowedOrigins(origins...),
+		proxy.WithAllowedOrigins(cfg.origins...),
+		proxy.WithBackendHeaders(cfg.headers),
 	}
 	return append(opts, c.mtlsOpts()...)
 }
@@ -156,6 +171,24 @@ func splitCSV(raw string) []string {
 		return strings.Split(raw, ",")
 	}
 	return vals
+}
+
+func (c *serveCmd) backendHeaders() (map[string]string, error) {
+	headers := make(map[string]string, len(c.BackendHeaders))
+	for k, v := range c.BackendHeaders {
+		k = strings.TrimSpace(k)
+		if k == "" {
+			return nil, fmt.Errorf("backend-header: header key is required")
+		}
+		if strings.ContainsAny(k, "\r\n") {
+			return nil, fmt.Errorf("backend-header: invalid header key %q", k)
+		}
+		if strings.ContainsAny(v, "\r\n") {
+			return nil, fmt.Errorf("backend-header: invalid value for %q", k)
+		}
+		headers[http.CanonicalHeaderKey(k)] = strings.TrimSpace(v)
+	}
+	return headers, nil
 }
 
 func parseBackend(raw string) (*url.URL, error) {

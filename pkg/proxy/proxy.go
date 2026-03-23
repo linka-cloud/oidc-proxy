@@ -103,6 +103,7 @@ func New(opt ...Option) (Proxy, error) {
 			tk = c.Value
 		}
 		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tk))
+		setBackendHeaders(r, opts.backendHeaders)
 		acl.EnforceFunc(prox.ServeHTTP).ServeHTTP(w, r)
 	})
 	cors := cors.New(cors.Options{
@@ -132,4 +133,10 @@ func (p *proxy) ServeTLS(certFile, keyFile string) error {
 
 func (p *proxy) Handler() http.Handler {
 	return p.mux
+}
+
+func setBackendHeaders(r *http.Request, headers map[string]string) {
+	for k, v := range headers {
+		r.Header.Set(k, v)
+	}
 }

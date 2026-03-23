@@ -14,6 +14,7 @@ type options struct {
 	configPath     string
 	address        string
 	allowedOrigins []string
+	backendHeaders map[string]string
 
 	clientCA   string
 	clientKey  string
@@ -56,6 +57,23 @@ func WithAllowedOrigins(origin ...string) Option {
 	return func(o *options) {
 		o.allowedOrigins = origin
 	}
+}
+
+func WithBackendHeaders(headers map[string]string) Option {
+	return func(o *options) {
+		o.backendHeaders = copyHeaders(headers)
+	}
+}
+
+func copyHeaders(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 func WithClientCA(ca string) Option {
