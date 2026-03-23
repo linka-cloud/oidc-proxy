@@ -2,176 +2,168 @@ package main
 
 import (
 	"context"
+	"encoding/csv"
+	"fmt"
 	"net/url"
 	"os"
+	"strings"
 
-	"github.com/urfave/cli/v2"
+	"github.com/spf13/cobra"
+	toolkit_cli "go.linka.cloud/grpc-toolkit/cli"
 	"go.linka.cloud/grpc-toolkit/logger"
 
-	proxy "go.linka.cloud/oidc-proxy/pkg/proxy"
-
 	oidc_handlers "go.linka.cloud/oidc-handlers"
+
+	"go.linka.cloud/oidc-proxy/pkg/proxy"
 )
 
-func main() {
-	oidcConfig := oidc_handlers.Config{}
-	configPath := "config.yaml"
-	address := ":8888"
-	allowedOrigins := &cli.StringSlice{}
-	var opts []proxy.Option
+const allowedOriginsEnv = "ALLOWED_ORIGINS"
 
-	app := cli.NewApp()
-	app.Name = "oidc-proxy"
-	app.Usage = "An OIDC Proxy"
-	app.Commands = []*cli.Command{
-		{
-			Name:      "serve",
-			Usage:     "serve [backend]",
-			ArgsUsage: "backend: the backend to be proxied",
-			Flags: append(app.Flags,
-				&cli.StringFlag{
-					Name:        "issuer-url",
-					Destination: &oidcConfig.IssuerURL,
-					EnvVars:     []string{"ISSUER_URL"},
-					Required:    true,
-				},
-				&cli.StringFlag{
-					Name:        "client-id",
-					Destination: &oidcConfig.ClientID,
-					EnvVars:     []string{"CLIENT_ID"},
-					Required:    true,
-				},
-				&cli.StringFlag{
-					Name:        "client-secret",
-					Destination: &oidcConfig.ClientSecret,
-					EnvVars:     []string{"CLIENT_SECRET"},
-					Required:    true,
-				},
-				&cli.StringFlag{
-					Name:        "callback-url",
-					Destination: &oidcConfig.OauthCallback,
-					EnvVars:     []string{"CALLBACK_URL"},
-				},
-				&cli.StringFlag{
-					Name:        "address",
-					Destination: &address,
-					EnvVars:     []string{"ADDRESS"},
-					Value:       ":8888",
-				},
-				&cli.StringFlag{
-					Name:        "cookie-domain",
-					Destination: &oidcConfig.CookieConfig.Domain,
-					EnvVars:     []string{"COOKIE_DOMAIN"},
-				},
-				&cli.StringFlag{
-					Name:        "id-token-cookie",
-					Destination: &oidcConfig.CookieConfig.IDTokenName,
-					EnvVars:     []string{"ID_TOKEN_COOKIE"},
-					Usage:       "the id token cookie name",
-					Value:       "id_token",
-				},
-				&cli.StringFlag{
-					Name:        "refresh-token-cookie",
-					Destination: &oidcConfig.CookieConfig.RefreshTokenName,
-					EnvVars:     []string{"REFRESH_TOKEN_COOKIE"},
-					Usage:       "the refresh token cookie name",
-					Value:       "refresh_token",
-				},
-				&cli.StringFlag{
-					Name:        "auth-state-cookie",
-					Destination: &oidcConfig.CookieConfig.AuthStateName,
-					EnvVars:     []string{"AUTH_STATE_COOKIE"},
-					Usage:       "the auth state cookie name",
-					Value:       "auth_state",
-				},
-				&cli.StringFlag{
-					Name:        "redirect-cookie",
-					Destination: &oidcConfig.CookieConfig.RedirectName,
-					EnvVars:     []string{"REDIRECT_COOKIE"},
-					Usage:       "the redirect cookie name",
-					Value:       "redirect",
-				},
-				&cli.BoolFlag{
-					Name:        "cookie-secure",
-					Destination: &oidcConfig.CookieConfig.Secure,
-					EnvVars:     []string{"COOKIE_SECURE"},
-					Usage:       "whether the cookie is secure",
-				},
-				&cli.StringFlag{
-					Name:        "session-key",
-					Usage:       "the session key used to encrypt the session cookie.",
-					Destination: &oidcConfig.CookieConfig.Key,
-					EnvVars:     []string{"SESSION_KEY"},
-				},
-				&cli.StringFlag{
-					Name:        "config",
-					Destination: &configPath,
-				},
-				&cli.StringSliceFlag{
-					Name:        "allowed-origins",
-					Usage:       "cors' allowed origins",
-					Destination: allowedOrigins,
-					EnvVars:     []string{"ALLOWED_ORIGINS"},
-				},
-				&cli.StringFlag{
-					Name:    "client-ca",
-					Usage:   "the client ca used to verify the backend cert",
-					EnvVars: []string{"CLIENT_CA"},
-					Action: func(c *cli.Context, s string) error {
-						opts = append(opts, proxy.WithClientCA(s))
-						return nil
-					},
-				},
-				&cli.StringFlag{
-					Name:    "client-key",
-					Usage:   "the client key used to authenticate to the backend with mTLS.",
-					EnvVars: []string{"CLIENT_KEY"},
-					Action: func(c *cli.Context, s string) error {
-						opts = append(opts, proxy.WithClientKey(s))
-						return nil
-					},
-				},
-				&cli.StringFlag{
-					Name:    "client-cert",
-					Usage:   "the client cert used to authenticate to the backend with mTLS.",
-					EnvVars: []string{"CLIENT_CERT"},
-					Action: func(c *cli.Context, s string) error {
-						opts = append(opts, proxy.WithClientCert(s))
-						return nil
-					},
-				},
-			),
-			Action: func(c *cli.Context) error {
-				if c.Args().Len() == 0 {
-					logger.C(context.Background()).Fatal("expected proxy backend as argument")
-				}
+type OIDC struct {
+	IssuerURL    string `name:"issuer-url" usage:"oidc issuer URL" env:"ISSUER_URL"`
+	ClientID     string `name:"client-id" usage:"oidc client id" env:"CLIENT_ID"`
+	ClientSecret string `name:"client-secret" usage:"oidc client secret" env:"CLIENT_SECRET"`
+	CallbackURL  string `name:"callback-url" usage:"oidc callback URL" env:"CALLBACK_URL"`
+}
 
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				log := logger.C(ctx).WithField("component", "oidc-proxy")
+type Cookie struct {
+	CookieDomain       string `name:"cookie-domain" usage:"cookie domain" env:"COOKIE_DOMAIN"`
+	IDTokenCookie      string `name:"id-token-cookie" usage:"the id token cookie name" env:"ID_TOKEN_COOKIE" default:"id_token"`
+	RefreshTokenCookie string `name:"refresh-token-cookie" usage:"the refresh token cookie name" env:"REFRESH_TOKEN_COOKIE" default:"refresh_token"`
+	AuthStateCookie    string `name:"auth-state-cookie" usage:"the auth state cookie name" env:"AUTH_STATE_COOKIE" default:"auth_state"`
+	RedirectCookie     string `name:"redirect-cookie" usage:"the redirect cookie name" env:"REDIRECT_COOKIE" default:"redirect"`
+	CookieSecure       bool   `name:"cookie-secure" usage:"whether the cookie is secure" env:"COOKIE_SECURE"`
+	SessionKey         string `name:"session-key" usage:"the session key used to encrypt the session cookie" env:"SESSION_KEY"`
+}
 
-				u, err := url.Parse(c.Args().First())
-				if err != nil {
-					log.WithError(err).Fatal("parse backend")
-				}
-				if u.Scheme == "" {
-					u.Scheme = "http"
-				}
-				opts = append(opts,
-					proxy.WithContext(ctx),
-					proxy.WithBackend(u),
-					proxy.WithOIDC(oidcConfig),
-					proxy.WithConfig(configPath),
-					proxy.WithAddress(address),
-					proxy.WithAllowedOrigins(allowedOrigins.Value()...),
-				)
-				proxy, err := proxy.New(opts...)
-				if err != nil {
-					log.WithError(err).Fatal("create proxy")
-				}
-				return proxy.Serve()
-			},
+type MTLS struct {
+	ClientCA   string `name:"client-ca" usage:"the client ca used to verify the backend cert" env:"CLIENT_CA"`
+	ClientKey  string `name:"client-key" usage:"the client key used to authenticate to the backend with mTLS" env:"CLIENT_KEY"`
+	ClientCert string `name:"client-cert" usage:"the client cert used to authenticate to the backend with mTLS" env:"CLIENT_CERT"`
+}
+
+type serveCmd struct {
+	OIDC
+	Cookie
+	MTLS
+	Address        string   `name:"address" usage:"listen address" env:"ADDRESS" default:":8888"`
+	ConfigPath     string   `name:"config" usage:"acl config path" default:"config.yaml"`
+	AllowedOrigins []string `name:"allowed-origins" usage:"cors' allowed origins" env:"ALLOWED_ORIGINS"`
+}
+
+func (c *serveCmd) Run(cmd *cobra.Command, args []string) error {
+	if err := c.validate(); err != nil {
+		return err
+	}
+
+	ctx := cmd.Context()
+	log := logger.C(ctx).WithField("component", "oidc-proxy")
+	u, err := parseBackend(args[0])
+	if err != nil {
+		return err
+	}
+	p, err := proxy.New(c.opts(ctx, u)...)
+	if err != nil {
+		log.WithError(err).Error("create proxy")
+		return err
+	}
+	return p.Serve()
+}
+
+func (c *serveCmd) validate() error {
+	switch {
+	case c.IssuerURL == "":
+		return fmt.Errorf("issuer-url is required")
+	case c.ClientID == "":
+		return fmt.Errorf("client-id is required")
+	case c.ClientSecret == "":
+		return fmt.Errorf("client-secret is required")
+	default:
+		return nil
+	}
+}
+
+func (c *serveCmd) opts(ctx context.Context, u *url.URL) []proxy.Option {
+	opts := []proxy.Option{
+		proxy.WithContext(ctx),
+		proxy.WithBackend(u),
+		proxy.WithOIDC(c.oidcHandlerConfig()),
+		proxy.WithConfig(c.ConfigPath),
+		proxy.WithAddress(c.Address),
+		proxy.WithAllowedOrigins(c.allowedOrigins()...),
+	}
+	if c.ClientCA != "" {
+		opts = append(opts, proxy.WithClientCA(c.ClientCA))
+	}
+	if c.ClientKey != "" {
+		opts = append(opts, proxy.WithClientKey(c.ClientKey))
+	}
+	if c.ClientCert != "" {
+		opts = append(opts, proxy.WithClientCert(c.ClientCert))
+	}
+	return opts
+}
+
+func (c *serveCmd) oidcHandlerConfig() oidc_handlers.Config {
+	return oidc_handlers.Config{
+		IssuerURL:     c.IssuerURL,
+		ClientID:      c.ClientID,
+		ClientSecret:  c.ClientSecret,
+		OauthCallback: c.CallbackURL,
+		CookieConfig: oidc_handlers.CookieConfig{
+			Domain:           c.CookieDomain,
+			IDTokenName:      c.IDTokenCookie,
+			RefreshTokenName: c.RefreshTokenCookie,
+			AuthStateName:    c.AuthStateCookie,
+			RedirectName:     c.RedirectCookie,
+			Secure:           c.CookieSecure,
+			Key:              c.SessionKey,
 		},
 	}
-	app.Run(os.Args)
+}
+
+func (c *serveCmd) allowedOrigins() []string {
+	if len(c.AllowedOrigins) > 0 {
+		return c.AllowedOrigins
+	}
+	raw := os.Getenv(allowedOriginsEnv)
+	if raw == "" {
+		return nil
+	}
+	vals, err := csv.NewReader(strings.NewReader(raw)).Read()
+	if err != nil {
+		vals = strings.Split(raw, ",")
+	}
+	var origins []string
+	for _, v := range vals {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		origins = append(origins, v)
+	}
+	return origins
+}
+
+func parseBackend(raw string) (*url.URL, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, fmt.Errorf("parse backend: %w", err)
+	}
+	if u.Scheme == "" {
+		u.Scheme = "http"
+	}
+	return u, nil
+}
+
+func main() {
+	root := &cobra.Command{
+		Use:   "oidc-proxy",
+		Short: "An oidc Proxy",
+	}
+	root.AddCommand(toolkit_cli.Command(&serveCmd{}, &cobra.Command{
+		Use:  "serve [backend]",
+		Args: cobra.ExactArgs(1),
+	}))
+	toolkit_cli.Main(root)
 }
