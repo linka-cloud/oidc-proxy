@@ -52,7 +52,8 @@ type serveCmd struct {
 }
 
 func (c *serveCmd) Run(cmd *cobra.Command, args []string) error {
-	if err := c.validate(); err != nil {
+	origins := c.allowedOrigins()
+	if err := c.validate(origins); err != nil {
 		return err
 	}
 
@@ -62,7 +63,7 @@ func (c *serveCmd) Run(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	p, err := proxy.New(c.opts(ctx, u)...)
+	p, err := proxy.New(c.opts(ctx, u, origins)...)
 	if err != nil {
 		log.WithError(err).Error("create proxy")
 		return err
@@ -70,28 +71,36 @@ func (c *serveCmd) Run(cmd *cobra.Command, args []string) error {
 	return p.Serve()
 }
 
-func (c *serveCmd) validate() error {
-	switch {
-	case c.IssuerURL == "":
+func (c *serveCmd) validate(origins []string) error {
+	if c.IssuerURL == "" {
 		return fmt.Errorf("issuer-url is required")
-	case c.ClientID == "":
-		return fmt.Errorf("client-id is required")
-	case c.ClientSecret == "":
-		return fmt.Errorf("client-secret is required")
-	default:
-		return nil
 	}
+	if c.ClientID == "" {
+		return fmt.Errorf("client-id is required")
+	}
+	if c.ClientSecret == "" {
+		return fmt.Errorf("client-secret is required")
+	}
+	if err := validateOrigins(origins); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (c *serveCmd) opts(ctx context.Context, u *url.URL) []proxy.Option {
+func (c *serveCmd) opts(ctx context.Context, u *url.URL, origins []string) []proxy.Option {
 	opts := []proxy.Option{
 		proxy.WithContext(ctx),
 		proxy.WithBackend(u),
-		proxy.WithOIDC(c.oidcHandlerConfig()),
+		proxy.WithOIDC(c.oidcConfig()),
 		proxy.WithConfig(c.ConfigPath),
 		proxy.WithAddress(c.Address),
-		proxy.WithAllowedOrigins(c.allowedOrigins()...),
+		proxy.WithAllowedOrigins(origins...),
 	}
+	return append(opts, c.mtlsOpts()...)
+}
+
+func (c *serveCmd) mtlsOpts() []proxy.Option {
+	var opts []proxy.Option
 	if c.ClientCA != "" {
 		opts = append(opts, proxy.WithClientCA(c.ClientCA))
 	}
@@ -104,7 +113,7 @@ func (c *serveCmd) opts(ctx context.Context, u *url.URL) []proxy.Option {
 	return opts
 }
 
-func (c *serveCmd) oidcHandlerConfig() oidc_handlers.Config {
+func (c *serveCmd) oidcConfig() oidc_handlers.Config {
 	return oidc_handlers.Config{
 		IssuerURL:     c.IssuerURL,
 		ClientID:      c.ClientID,
@@ -130,12 +139,8 @@ func (c *serveCmd) allowedOrigins() []string {
 	if raw == "" {
 		return nil
 	}
-	vals, err := csv.NewReader(strings.NewReader(raw)).Read()
-	if err != nil {
-		vals = strings.Split(raw, ",")
-	}
 	var origins []string
-	for _, v := range vals {
+	for _, v := range splitCSV(raw) {
 		v = strings.TrimSpace(v)
 		if v == "" {
 			continue
@@ -145,15 +150,57 @@ func (c *serveCmd) allowedOrigins() []string {
 	return origins
 }
 
+func splitCSV(raw string) []string {
+	vals, err := csv.NewReader(strings.NewReader(raw)).Read()
+	if err != nil {
+		return strings.Split(raw, ",")
+	}
+	return vals
+}
+
 func parseBackend(raw string) (*url.URL, error) {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return nil, fmt.Errorf("parse backend: %w", err)
 	}
 	if u.Scheme == "" {
-		u.Scheme = "http"
+		return nil, fmt.Errorf("parse backend: scheme is required")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("parse backend: unsupported scheme %q", u.Scheme)
+	}
+	if u.Host == "" {
+		return nil, fmt.Errorf("parse backend: host is required")
 	}
 	return u, nil
+}
+
+func validateOrigins(origins []string) error {
+	for _, v := range origins {
+		if v == "*" {
+			return fmt.Errorf("allowed-origins: wildcard origin is not allowed")
+		}
+		u, err := url.Parse(v)
+		if err != nil {
+			return fmt.Errorf("allowed-origins: parse %q: %w", v, err)
+		}
+		if u.Scheme != "http" && u.Scheme != "https" {
+			return fmt.Errorf("allowed-origins: unsupported scheme %q for %q", u.Scheme, v)
+		}
+		if u.Host == "" {
+			return fmt.Errorf("allowed-origins: host is required for %q", v)
+		}
+		if u.Path != "" && u.Path != "/" {
+			return fmt.Errorf("allowed-origins: path is not allowed for %q", v)
+		}
+		if u.RawQuery != "" {
+			return fmt.Errorf("allowed-origins: query is not allowed for %q", v)
+		}
+		if u.Fragment != "" {
+			return fmt.Errorf("allowed-origins: fragment is not allowed for %q", v)
+		}
+	}
+	return nil
 }
 
 func main() {
