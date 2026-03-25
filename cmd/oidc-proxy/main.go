@@ -10,10 +10,10 @@ import (
 	"strings"
 
 	"github.com/spf13/cobra"
-	toolkit_cli "go.linka.cloud/grpc-toolkit/cli"
+	"go.linka.cloud/grpc-toolkit/cli"
 	"go.linka.cloud/grpc-toolkit/logger"
+	oidch "go.linka.cloud/oidc-handlers"
 
-	oidc_handlers "go.linka.cloud/oidc-handlers"
 	"go.linka.cloud/oidc-proxy/pkg/proxy"
 )
 
@@ -128,13 +128,13 @@ func (c *serveCmd) mtlsOpts() []proxy.Option {
 	return opts
 }
 
-func (c *serveCmd) oidcConfig() oidc_handlers.Config {
-	return oidc_handlers.Config{
+func (c *serveCmd) oidcConfig() oidch.Config {
+	return oidch.Config{
 		IssuerURL:     c.IssuerURL,
 		ClientID:      c.ClientID,
 		ClientSecret:  c.ClientSecret,
 		OauthCallback: c.CallbackURL,
-		CookieConfig: oidc_handlers.CookieConfig{
+		CookieConfig: oidch.CookieConfig{
 			Domain:           c.CookieDomain,
 			IDTokenName:      c.IDTokenCookie,
 			RefreshTokenName: c.RefreshTokenCookie,
@@ -241,9 +241,9 @@ func main() {
 		Use:   "oidc-proxy",
 		Short: "An oidc Proxy",
 	}
-	root.AddCommand(toolkit_cli.Command(&serveCmd{}, &cobra.Command{
+	root.AddCommand(cli.Command(&serveCmd{}, &cobra.Command{
 		Use:  "serve [backend]",
 		Args: cobra.ExactArgs(1),
 	}))
-	toolkit_cli.Main(root)
+	cli.Main(root)
 }

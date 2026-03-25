@@ -8,11 +8,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httputil"
-	"net/url"
 	"os"
 
 	"github.com/rs/cors"
 	"go.linka.cloud/grpc-toolkit/logger"
+	oidch "go.linka.cloud/oidc-handlers"
 
 	acl2 "go.linka.cloud/oidc-proxy/pkg/acl"
 	"go.linka.cloud/oidc-proxy/pkg/config"
@@ -64,13 +64,12 @@ func New(opt ...Option) (Proxy, error) {
 		}
 	}
 
-	oidc, err := opts.oidcConfig.WebHandler(opts.ctx)
+	mw, err := opts.oidcConfig.WebMiddleware(opts.ctx, oidch.WebMiddlewareConfig{
+		LoginPath:  "/oidc/auth",
+		LogoutPath: "/oidc/logout",
+	})
 	if err != nil {
 		return nil, err
-	}
-	cURL, err := url.Parse(opts.oidcConfig.OauthCallback)
-	if err != nil {
-		return nil, fmt.Errorf("parse callback url: %w", err)
 	}
 	conf, err := config.Load(opts.configPath)
 	if err != nil {
@@ -83,29 +82,29 @@ func New(opt ...Option) (Proxy, error) {
 	aclChan := conf.Watch()
 	go func() {
 		for {
-			acl.UpdateACL(<-aclChan)
+			select {
+			case a, ok := <-aclChan:
+				if !ok {
+					return
+				}
+				acl.UpdateACL(a)
+			case <-opts.ctx.Done():
+				return
+			}
 		}
 	}()
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/oidc/auth", oidc.RedirectHandler)
-	mux.HandleFunc("/oidc/logout", oidc.LogoutHandler)
-	mux.HandleFunc(cURL.Path, oidc.CallbackHandler)
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		tk, err := oidc.Refresh(w, r)
-		if err != nil {
-			logger.C(r.Context()).WithField("component", "proxy").WithError(err).Error("refresh token")
-			oidc.SetRedirectCookie(w, "/")
-			http.Redirect(w, r, "/oidc/auth", http.StatusSeeOther)
+	h := mw(acl.Enforce(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		tk, ok := oidch.RawIDTokenFromContext(r.Context())
+		if !ok || tk == "" {
+			logger.C(r.Context()).WithField("component", "proxy").Error("raw id token missing from context")
+			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
-		}
-		if c, err := r.Cookie(opts.oidcConfig.CookieConfig.IDTokenName); tk == "" && err == nil {
-			tk = c.Value
 		}
 		r.Header.Set("Authorization", fmt.Sprintf("Bearer %s", tk))
 		setBackendHeaders(r, opts.backendHeaders)
-		acl.EnforceFunc(prox.ServeHTTP).ServeHTTP(w, r)
-	})
+		prox.ServeHTTP(w, r)
+	})))
 	cors := cors.New(cors.Options{
 		AllowedOrigins: opts.allowedOrigins,
 		AllowedMethods: []string{
@@ -120,7 +119,7 @@ func New(opt ...Option) (Proxy, error) {
 		AllowedHeaders:   []string{"*"},
 		AllowCredentials: true,
 	})
-	return &proxy{mux: cors.Handler(mux), opts: opts}, nil
+	return &proxy{mux: cors.Handler(h), opts: opts}, nil
 }
 
 func (p *proxy) Serve() error {

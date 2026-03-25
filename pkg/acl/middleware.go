@@ -3,7 +3,7 @@ package acl
 import (
 	"net/http"
 
-	oidc_handlers "go.linka.cloud/oidc-handlers"
+	oidch "go.linka.cloud/oidc-handlers"
 )
 
 func NewACLMiddleware(a *ACL) (*ACLMiddleware, error) {
@@ -37,7 +37,7 @@ func (m *ACLMiddleware) Enforce(next http.Handler) http.Handler {
 			m.enforce(next, w, r, m.acl.DefaultPolicy)
 			return
 		}
-		claims, ok := oidc_handlers.ClaimsFromContext(r.Context())
+		claims, ok := oidch.ClaimsFromContext(r.Context())
 		if !ok {
 			m.enforce(next, w, r, endpoint.DefaultPolicy)
 			return

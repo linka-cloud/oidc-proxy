@@ -7,15 +7,15 @@ require (
 	github.com/rs/cors v1.11.1
 	github.com/spf13/cobra v1.3.0
 	github.com/spf13/viper v1.17.0
-	go.linka.cloud/grpc-toolkit v0.4.5-0.20260310120842-726085f5ccf3
-	go.linka.cloud/oidc-handlers v0.1.1-0.20260323135854-367ca113b6e4
+	go.linka.cloud/grpc-toolkit v0.4.5-0.20260325140852-2556af88879b
+	go.linka.cloud/oidc-handlers v0.1.1-0.20260325141208-fb64b6c76a7f
 )
 
 require (
 	github.com/bombsimon/logrusr/v4 v4.0.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/frankban/quicktest v1.14.5 // indirect
-	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
@@ -45,12 +45,12 @@ require (
 	golang.org/x/crypto v0.47.0 // indirect
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/oauth2 v0.35.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.40.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20250519155744-55703ea1f237 // indirect
-	google.golang.org/grpc v1.72.1 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20251202230838-ff82c1b0f217 // indirect
+	google.golang.org/grpc v1.79.3 // indirect
+	google.golang.org/protobuf v1.36.10 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

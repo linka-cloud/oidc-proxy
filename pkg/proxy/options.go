@@ -4,13 +4,13 @@ import (
 	"context"
 	"net/url"
 
-	oidc_handlers "go.linka.cloud/oidc-handlers"
+	oidch "go.linka.cloud/oidc-handlers"
 )
 
 type options struct {
 	ctx            context.Context
 	u              *url.URL
-	oidcConfig     oidc_handlers.Config
+	oidcConfig     oidch.Config
 	configPath     string
 	address        string
 	allowedOrigins []string
@@ -35,7 +35,7 @@ func WithBackend(backend *url.URL) Option {
 	}
 }
 
-func WithOIDC(oidcConfig oidc_handlers.Config) Option {
+func WithOIDC(oidcConfig oidch.Config) Option {
 	return func(o *options) {
 		o.oidcConfig = oidcConfig
 	}
