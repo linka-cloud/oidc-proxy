@@ -17,7 +17,10 @@ import (
 	"go.linka.cloud/oidc-proxy/pkg/proxy"
 )
 
-const allowedOriginsEnv = "ALLOWED_ORIGINS"
+const (
+	allowedOriginsEnv = "ALLOWED_ORIGINS"
+	backendHeaders    = "BACKEND_HEADERS"
+)
 
 type OIDC struct {
 	IssuerURL    string `name:"issuer-url" usage:"oidc issuer URL" env:"ISSUER_URL"`
@@ -46,10 +49,10 @@ type serveCmd struct {
 	OIDC
 	Cookie
 	MTLS
-	Address        string            `name:"address" usage:"listen address" env:"ADDRESS" default:":8888"`
-	ConfigPath     string            `name:"config" usage:"acl config path" default:"config.yaml"`
-	AllowedOrigins []string          `name:"allowed-origins" usage:"cors' allowed origins" env:"ALLOWED_ORIGINS"`
-	BackendHeaders map[string]string `name:"backend-header" usage:"header to pass to backend (repeat key=value)"`
+	Address        string   `name:"address" usage:"listen address" env:"ADDRESS" default:":8888"`
+	ConfigPath     string   `name:"config" usage:"acl config path" default:"config.yaml"`
+	AllowedOrigins []string `name:"allowed-origins" usage:"cors' allowed origins" env:"ALLOWED_ORIGINS"`
+	BackendHeaders []string `name:"backend-header" usage:"header to pass to backend (repeat key=value)" env:"BACKEND_HEADERS"`
 }
 
 type runCfg struct {
@@ -150,12 +153,8 @@ func (c *serveCmd) allowedOrigins() []string {
 	if len(c.AllowedOrigins) > 0 {
 		return c.AllowedOrigins
 	}
-	raw := os.Getenv(allowedOriginsEnv)
-	if raw == "" {
-		return nil
-	}
 	var origins []string
-	for _, v := range splitCSV(raw) {
+	for _, v := range splitCSV(os.Getenv(allowedOriginsEnv)) {
 		v = strings.TrimSpace(v)
 		if v == "" {
 			continue
@@ -175,8 +174,12 @@ func splitCSV(raw string) []string {
 
 func (c *serveCmd) backendHeaders() (map[string]string, error) {
 	headers := make(map[string]string, len(c.BackendHeaders))
-	for k, v := range c.BackendHeaders {
-		k = strings.TrimSpace(k)
+	for _, v := range splitCSV(os.Getenv(backendHeaders)) {
+		parts := strings.SplitN(strings.TrimSpace(v), "=", 2)
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("backend-header: invalid value: expected key=value")
+		}
+		k, v := parts[0], parts[1]
 		if k == "" {
 			return nil, fmt.Errorf("backend-header: header key is required")
 		}

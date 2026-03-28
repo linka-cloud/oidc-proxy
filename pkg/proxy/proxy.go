@@ -64,9 +64,9 @@ func New(opt ...Option) (Proxy, error) {
 		}
 	}
 
-	mw, err := opts.oidcConfig.WebMiddleware(opts.ctx, oidch.WebMiddlewareConfig{
-		LoginPath:  "/oidc/auth",
-		LogoutPath: "/oidc/logout",
+	mw, err := opts.oidcConfig.WebMiddleware(opts.ctx, oidch.Endpoints{
+		Login:  "/oidc/auth",
+		Logout: "/oidc/logout",
 	})
 	if err != nil {
 		return nil, err

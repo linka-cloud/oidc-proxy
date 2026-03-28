@@ -35,6 +35,7 @@ type Endpoint struct {
 	Host          string `yaml:"host" mapstructure:"host" json:"host"`
 	DefaultPolicy Policy `yaml:"defaultPolicy" mapstructure:"defaultPolicy" json:"defaultPolicy"`
 	Groups        Groups `yaml:"groups" mapstructure:"groups" json:"groups"`
+	Users         Users  `yaml:"users" mapstructure:"users" json:"users"`
 }
 
 type Endpoints []*Endpoint
@@ -58,6 +59,22 @@ type Groups []*Group
 func (g Groups) For(group string) (*Group, bool) {
 	for _, v := range g {
 		if strings.EqualFold(v.Name, group) {
+			return v, true
+		}
+	}
+	return nil, false
+}
+
+type User struct {
+	Name   string `yaml:"name" mapstructure:"name" json:"name"`
+	Policy Policy `yaml:"policy" mapstructure:"policy" json:"policy"`
+}
+
+type Users []*User
+
+func (u Users) For(user string) (*User, bool) {
+	for _, v := range u {
+		if strings.EqualFold(v.Name, user) {
 			return v, true
 		}
 	}

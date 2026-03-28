@@ -54,6 +54,14 @@ func (m *ACLMiddleware) Enforce(next http.Handler) http.Handler {
 				return
 			}
 		}
+		if u, ok := endpoint.Users.For(claims.Name); ok {
+			found = true
+			if u.Policy.Equals(RejectPolicy) {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				return
+			}
+		}
+
 		if !found {
 			m.enforce(next, w, r, endpoint.DefaultPolicy)
 			return
